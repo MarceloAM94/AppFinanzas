@@ -29,19 +29,19 @@ export default function MesSelector() {
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-1 sm:gap-3">
       <button
         onClick={mesAnterior}
-        className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 text-sm hover:bg-gray-50 active:bg-gray-100"
+        className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-xs hover:bg-gray-50 active:bg-gray-100 sm:h-11 sm:w-11 sm:text-sm"
       >
         ←
       </button>
-      <span className="min-w-[140px] text-center text-xs font-semibold text-gray-700 sm:text-sm">
+      <span className="min-w-[100px] text-center text-xs font-semibold text-gray-700 sm:min-w-[140px] sm:text-sm">
         {MESES[mesActual]} {anioActual}
       </span>
       <button
         onClick={mesSiguiente}
-        className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 text-sm hover:bg-gray-50 active:bg-gray-100"
+        className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 text-xs hover:bg-gray-50 active:bg-gray-100 sm:h-11 sm:w-11 sm:text-sm"
       >
         →
       </button>

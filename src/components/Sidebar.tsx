@@ -18,11 +18,13 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Botón hamburguesa - siempre visible en mobile */}
+      {/* Botón hamburguesa - solo visible en mobile cuando el drawer está cerrado */}
       <button
         onClick={toggleDrawer}
-        className="fixed top-4 left-4 z-50 rounded-lg bg-white p-2 shadow-md hover:bg-gray-50 md:hidden"
-        aria-label="Toggle menu"
+        className={`fixed top-4 left-4 z-50 rounded-lg bg-white p-2 shadow-md hover:bg-gray-50 md:hidden ${
+          drawerAbierto ? "hidden" : ""
+        }`}
+        aria-label="Abrir menú"
       >
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -45,9 +47,20 @@ export default function Sidebar() {
       >
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center gap-2 border-b border-gray-200 p-4">
-            <span className="text-2xl">💰</span>
-            <h1 className="text-lg font-bold text-gray-800">Mis Finanzas</h1>
+          <div className="flex items-center justify-between border-b border-gray-200 p-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">💰</span>
+              <h1 className="text-lg font-bold text-gray-800">Mis Finanzas</h1>
+            </div>
+            <button
+              onClick={toggleDrawer}
+              className="rounded-lg p-1 hover:bg-gray-100 md:hidden"
+              aria-label="Cerrar menú"
+            >
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
           {/* Navegación */}
