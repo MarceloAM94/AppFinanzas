@@ -34,33 +34,53 @@ export default function DashboardContent() {
     ingresosAnuales: Array<{ mes: number; total: number }>;
     tipoMensual: Array<{ mes: number; fijo: number; hormiga: number; variable: number }>;
   } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const [totalIngresos, totalGastos, porTipo, fijos, porCategoria, gastosAnuales, ingresosAnuales, tipoMensual] =
-        await Promise.all([
-          totalIngresosDelMes(mesActual, anioActual),
-          totalGastosDelMes(mesActual, anioActual),
-          gastosPorTipo(mesActual, anioActual),
-          gastosFijosActivos(),
-          gastosPorCategoria(mesActual, anioActual),
-          gastosMensuales(anioActual),
-          ingresosMensuales(anioActual),
-          gastosPorTipoMensual(anioActual),
-        ]);
-      setData({
-        totalIngresos,
-        totalGastos,
-        porTipo,
-        fijosActivos: fijos.length,
-        porCategoria,
-        gastosAnuales,
-        ingresosAnuales,
-        tipoMensual,
-      });
+      try {
+        const [totalIngresos, totalGastos, porTipo, fijos, porCategoria, gastosAnuales, ingresosAnuales, tipoMensual] =
+          await Promise.all([
+            totalIngresosDelMes(mesActual, anioActual),
+            totalGastosDelMes(mesActual, anioActual),
+            gastosPorTipo(mesActual, anioActual),
+            gastosFijosActivos(),
+            gastosPorCategoria(mesActual, anioActual),
+            gastosMensuales(anioActual),
+            ingresosMensuales(anioActual),
+            gastosPorTipoMensual(anioActual),
+          ]);
+        setData({
+          totalIngresos,
+          totalGastos,
+          porTipo,
+          fijosActivos: fijos.length,
+          porCategoria,
+          gastosAnuales,
+          ingresosAnuales,
+          tipoMensual,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al cargar datos");
+      }
     }
     load();
   }, [mesActual, anioActual]);
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+          <p className="text-lg font-medium text-red-700">Error al cargar datos</p>
+          <p className="mt-2 text-sm text-red-600">{error}</p>
+          <p className="mt-4 text-xs text-red-500">
+            Asegúrate de que las variables de entorno de Supabase estén configuradas en Vercel.
+            <br />Revisa también que el dominio de Vercel esté permitido en Supabase (CORS).
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!data) {
     return (
