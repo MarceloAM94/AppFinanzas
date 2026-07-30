@@ -28,6 +28,7 @@ export default function GastosFijosPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     nombre: "",
@@ -52,6 +53,7 @@ export default function GastosFijosPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setGuardando(true);
     try {
       await agregarGastoFijo(
         form.nombre,
@@ -62,9 +64,11 @@ export default function GastosFijosPage() {
       );
       setForm({ nombre: "", monto_estimado: "", categoria_id: "", dia_del_mes: "1", frecuencia: "mensual" });
       setShowForm(false);
+      setGuardando(false);
       await cargar();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al guardar");
+      setGuardando(false);
     }
   }
 
@@ -104,7 +108,7 @@ export default function GastosFijosPage() {
       )}
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="animate-fade-slide-in rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold">Nuevo Gasto Fijo</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -147,8 +151,8 @@ export default function GastosFijosPage() {
             </div>
           </div>
           <div className="mt-4 flex gap-2">
-            <button type="submit" className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">
-              Agregar
+            <button type="submit" disabled={guardando} className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50">
+              {guardando ? "Guardando..." : "Agregar"}
             </button>
             <button type="button" onClick={() => setShowForm(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
               Cancelar
@@ -161,7 +165,10 @@ export default function GastosFijosPage() {
         {cargando ? (
           <div className="p-6 text-center text-gray-400">Cargando...</div>
         ) : gastosFijos.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No hay gastos fijos configurados</div>
+          <div className="p-6 text-center">
+            <p className="text-gray-400">No hay gastos fijos configurados</p>
+            <p className="mt-1 text-xs text-gray-300">Presiona <strong>+ Nuevo</strong> para agregar uno</p>
+          </div>
         ) : (
           <div className="divide-y divide-gray-100">
             {gastosFijos.map((gf) => {

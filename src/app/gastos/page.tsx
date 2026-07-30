@@ -14,6 +14,8 @@ export default function GastosPage() {
   const [cargando, setCargando] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ monto: "", tipo: "variable", categoria_id: "", fecha: "", nota: "" });
 
   useEffect(() => {
@@ -22,17 +24,23 @@ export default function GastosPage() {
 
   async function cargar() {
     setCargando(true);
-    const [g, c] = await Promise.all([
-      obtenerGastos(mesActual, anioActual),
-      obtenerCategorias(),
-    ]);
-    setGastos(g as Gasto[]);
-    setCategorias(c as Categoria[]);
+    setError(null);
+    try {
+      const [g, c] = await Promise.all([
+        obtenerGastos(mesActual, anioActual),
+        obtenerCategorias(),
+      ]);
+      setGastos(g as Gasto[]);
+      setCategorias(c as Categoria[]);
+    } catch {
+      setError("Error al cargar gastos");
+    }
     setCargando(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setGuardando(true);
     const datos = {
       monto: parseFloat(form.monto),
       tipo: form.tipo as "fijo" | "hormiga" | "variable",
@@ -48,6 +56,7 @@ export default function GastosPage() {
     setForm({ monto: "", tipo: "variable", categoria_id: "", fecha: "", nota: "" });
     setEditando(null);
     setShowForm(false);
+    setGuardando(false);
     await cargar();
   }
 
@@ -83,8 +92,14 @@ export default function GastosPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {showForm && (
-        <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="animate-fade-slide-in rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold">{editando ? "Editar Gasto" : "Nuevo Gasto"}</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
@@ -126,8 +141,8 @@ export default function GastosPage() {
             </div>
           </div>
           <div className="mt-4 flex gap-2">
-            <button type="submit" className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
-              {editando ? "Guardar" : "Agregar"}
+            <button type="submit" disabled={guardando} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+              {guardando ? "Guardando..." : editando ? "Guardar" : "Agregar"}
             </button>
             <button type="button" onClick={() => { setShowForm(false); setEditando(null); }} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
               Cancelar
@@ -140,7 +155,10 @@ export default function GastosPage() {
         {cargando ? (
           <div className="p-6 text-center text-gray-400">Cargando...</div>
         ) : gastos.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No hay gastos este mes</div>
+          <div className="p-6 text-center">
+            <p className="text-gray-400">No hay gastos este mes</p>
+            <p className="mt-1 text-xs text-gray-300">Presiona <strong>+ Nuevo</strong> para agregar uno</p>
+          </div>
         ) : (
           <div className="divide-y divide-gray-100">
             {gastos.map((g) => (
@@ -153,8 +171,8 @@ export default function GastosPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <span className="font-semibold text-red-600">-{formatearMoneda(Number(g.monto))}</span>
-                  <button onClick={() => iniciarEdicion(g)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-blue-600 hover:bg-blue-50 active:bg-blue-100">✏️</button>
-                  <button onClick={() => handleEliminar(g.id)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-red-600 hover:bg-red-50 active:bg-red-100">🗑️</button>
+                  <button onClick={() => iniciarEdicion(g)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-blue-600 hover:bg-blue-50 active:bg-blue-100 md:h-9 md:w-9">✏️</button>
+                  <button onClick={() => handleEliminar(g.id)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-red-600 hover:bg-red-50 active:bg-red-100 md:h-9 md:w-9">🗑️</button>
                 </div>
               </div>
             ))}

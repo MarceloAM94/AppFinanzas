@@ -8,6 +8,8 @@ export default function CategoriasPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ nombre: "", icono_color: "" });
 
   useEffect(() => {
@@ -16,16 +18,23 @@ export default function CategoriasPage() {
 
   async function cargar() {
     setCargando(true);
-    const data = await obtenerCategorias();
-    setCategorias(data as Categoria[]);
+    setError(null);
+    try {
+      const data = await obtenerCategorias();
+      setCategorias(data as Categoria[]);
+    } catch {
+      setError("Error al cargar categorías");
+    }
     setCargando(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setGuardando(true);
     await agregarCategoria(form.nombre, form.icono_color || undefined);
     setForm({ nombre: "", icono_color: "" });
     setShowForm(false);
+    setGuardando(false);
     await cargar();
   }
 
@@ -47,8 +56,14 @@ export default function CategoriasPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {showForm && (
-        <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="animate-fade-slide-in rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold">Nueva Categoría</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -65,8 +80,8 @@ export default function CategoriasPage() {
             </div>
           </div>
           <div className="mt-4 flex gap-2">
-            <button type="submit" className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700">
-              Agregar
+            <button type="submit" disabled={guardando} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50">
+              {guardando ? "Guardando..." : "Agregar"}
             </button>
             <button type="button" onClick={() => setShowForm(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
               Cancelar
@@ -79,7 +94,10 @@ export default function CategoriasPage() {
         {cargando ? (
           <div className="p-6 text-center text-gray-400">Cargando...</div>
         ) : categorias.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No hay categorías</div>
+          <div className="p-6 text-center">
+            <p className="text-gray-400">No hay categorías</p>
+            <p className="mt-1 text-xs text-gray-300">Presiona <strong>+ Nueva</strong> para agregar una</p>
+          </div>
         ) : (
           <div className="divide-y divide-gray-100">
             {categorias.map((cat) => (

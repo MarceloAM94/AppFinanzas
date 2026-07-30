@@ -12,6 +12,8 @@ export default function IngresosPage() {
   const [cargando, setCargando] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ monto: "", descripcion: "", fecha: "" });
 
   useEffect(() => {
@@ -20,13 +22,19 @@ export default function IngresosPage() {
 
   async function cargar() {
     setCargando(true);
-    const data = await obtenerIngresos(mesActual, anioActual);
-    setIngresos(data as Ingreso[]);
+    setError(null);
+    try {
+      const data = await obtenerIngresos(mesActual, anioActual);
+      setIngresos(data as Ingreso[]);
+    } catch {
+      setError("Error al cargar ingresos");
+    }
     setCargando(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setGuardando(true);
     if (editando) {
       await editarIngreso(editando, { monto: parseFloat(form.monto), descripcion: form.descripcion });
     } else {
@@ -35,6 +43,7 @@ export default function IngresosPage() {
     setForm({ monto: "", descripcion: "", fecha: "" });
     setEditando(null);
     setShowForm(false);
+    setGuardando(false);
     await cargar();
   }
 
@@ -66,8 +75,14 @@ export default function IngresosPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {showForm && (
-        <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <form onSubmit={handleSubmit} className="animate-fade-slide-in rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-lg font-semibold">{editando ? "Editar Ingreso" : "Nuevo Ingreso"}</h2>
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
@@ -103,8 +118,8 @@ export default function IngresosPage() {
             </div>
           </div>
           <div className="mt-4 flex gap-2">
-            <button type="submit" className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
-              {editando ? "Guardar" : "Agregar"}
+            <button type="submit" disabled={guardando} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
+              {guardando ? "Guardando..." : editando ? "Guardar" : "Agregar"}
             </button>
             <button type="button" onClick={() => { setShowForm(false); setEditando(null); }} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
               Cancelar
@@ -117,7 +132,10 @@ export default function IngresosPage() {
         {cargando ? (
           <div className="p-6 text-center text-gray-400">Cargando...</div>
         ) : ingresos.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No hay ingresos este mes</div>
+          <div className="p-6 text-center">
+            <p className="text-gray-400">No hay ingresos este mes</p>
+            <p className="mt-1 text-xs text-gray-300">Presiona <strong>+ Nuevo</strong> para agregar uno</p>
+          </div>
         ) : (
           <div className="divide-y divide-gray-100">
             {ingresos.map((ing) => (
@@ -128,8 +146,8 @@ export default function IngresosPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   <span className="font-semibold text-green-600">{formatearMoneda(Number(ing.monto))}</span>
-                  <button onClick={() => iniciarEdicion(ing)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-blue-600 hover:bg-blue-50 active:bg-blue-100">✏️</button>
-                  <button onClick={() => handleEliminar(ing.id)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-red-600 hover:bg-red-50 active:bg-red-100">🗑️</button>
+                  <button onClick={() => iniciarEdicion(ing)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-blue-600 hover:bg-blue-50 active:bg-blue-100 md:h-9 md:w-9">✏️</button>
+                  <button onClick={() => handleEliminar(ing.id)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-red-600 hover:bg-red-50 active:bg-red-100 md:h-9 md:w-9">🗑️</button>
                 </div>
               </div>
             ))}
