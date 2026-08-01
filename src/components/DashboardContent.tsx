@@ -10,6 +10,7 @@ import {
   gastosPorCategoria,
   gastosMensuales,
   gastosPorTipoMensual,
+  obtenerBalanceAcumulado,
 } from "@/lib/actions/gastos";
 import { gastosFijosActivos } from "@/lib/actions/gastos-fijos";
 import CategoryPieChart from "@/components/charts/CategoryPieChart";
@@ -27,6 +28,7 @@ export default function DashboardContent() {
   const [data, setData] = useState<{
     totalIngresos: number;
     totalGastos: number;
+    balanceAcumulado: number;
     porTipo: { fijo: number; hormiga: number; variable: number };
     fijosActivos: number;
     porCategoria: Array<{ categoria: string; icono_color: string; total: number }>;
@@ -39,10 +41,11 @@ export default function DashboardContent() {
   useEffect(() => {
     async function load() {
       try {
-        const [totalIngresos, totalGastos, porTipo, fijos, porCategoria, gastosAnuales, ingresosAnuales, tipoMensual] =
+        const [totalIngresos, totalGastos, balanceAcumulado, porTipo, fijos, porCategoria, gastosAnuales, ingresosAnuales, tipoMensual] =
           await Promise.all([
             totalIngresosDelMes(mesActual, anioActual),
             totalGastosDelMes(mesActual, anioActual),
+            obtenerBalanceAcumulado(mesActual, anioActual),
             gastosPorTipo(mesActual, anioActual),
             gastosFijosActivos(),
             gastosPorCategoria(mesActual, anioActual),
@@ -53,6 +56,7 @@ export default function DashboardContent() {
         setData({
           totalIngresos,
           totalGastos,
+          balanceAcumulado,
           porTipo,
           fijosActivos: fijos.length,
           porCategoria,
@@ -99,7 +103,7 @@ export default function DashboardContent() {
     );
   }
 
-  const balance = data.totalIngresos - data.totalGastos;
+  const balance = data.balanceAcumulado;
   const totalPorTipo = data.porTipo.fijo + data.porTipo.hormiga + data.porTipo.variable;
 
   return (
@@ -119,7 +123,7 @@ export default function DashboardContent() {
           </div>
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-medium text-gray-500">Balance</div>
+          <div className="text-sm font-medium text-gray-500">Saldo acumulado</div>
           <div className={`mt-1 text-2xl font-bold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
             {formatearMoneda(balance)}
           </div>

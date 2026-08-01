@@ -101,6 +101,25 @@ export async function gastosPorCategoria(mes: number, anio: number) {
   return Object.values(agrupado).sort((a, b) => b.total - a.total);
 }
 
+export async function obtenerBalanceAcumulado(mes: number, anio: number) {
+  const supabase = await createClient();
+  const fechaInicio = `${anio}-01-01`;
+  const fechaFin = mes === 11 ? `${anio + 1}-01-01` : `${anio}-${String(mes + 2).padStart(2, "0")}-01`;
+
+  const [{ data: ingresosData, error: ingresosError }, { data: gastosData, error: gastosError }] = await Promise.all([
+    supabase.from("ingresos").select("monto").is("deleted_at", null).gte("fecha", fechaInicio).lt("fecha", fechaFin),
+    supabase.from("gastos").select("monto").is("deleted_at", null).gte("fecha", fechaInicio).lt("fecha", fechaFin),
+  ]);
+
+  if (ingresosError) throw ingresosError;
+  if (gastosError) throw gastosError;
+
+  const ingresos = (ingresosData || []).reduce((sum, i) => sum + Number(i.monto), 0);
+  const gastos = (gastosData || []).reduce((sum, g) => sum + Number(g.monto), 0);
+
+  return ingresos - gastos;
+}
+
 export async function gastosMensuales(anio: number) {
   const supabase = await createClient();
   const fechaInicio = `${anio}-01-01`;
