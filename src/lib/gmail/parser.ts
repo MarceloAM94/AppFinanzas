@@ -17,6 +17,17 @@ const MONTO_POR_CAMPO = /\b(?:monto|importe|total|valor)\s*[:–]?\s*S\/\s*([0-9
 const FECHA_DMY = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:\s+(\d{1,2}):(\d{2}))?/;
 const FECHA_ISO = /(\d{4})-(\d{2})-(\d{2})/;
 
+const MESES: Record<string, number> = {
+  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+  julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10,
+  noviembre: 11, diciembre: 12,
+};
+const FECHA_LARGA = new RegExp(
+  `(\\d{1,2})\\s+de\\s+(${Object.keys(MESES).join("|")})\\s+de\\s+(\\d{4})(?:\\s*[-–]\\s*(\\d{1,2}):(\\d{2})\\s*(AM|PM|a\\.m\\.|p\\.m\\.))?`,
+  "i"
+);
+const PERU_UTC_OFFSET_HORAS = 5;
+
 const LABEL_SIGUIENTE =
   /\s(?:S\/|monto\b|fecha\b|hora\b|c[oó]digo\b|operaci[oó]n\b|referencia\b|estado\b|n[uú]mero\b|tipo\b)/i;
 
@@ -24,7 +35,7 @@ const LIMITE_COMERCIO = "(?:\\s*S\\/|\\s*(?:monto|fecha|hora|c[oó]digo|operaci[
 
 const CAMPOS_COMERCIO = [
   new RegExp(
-    `(?:comercio|establecimiento|destinatario|beneficiario|negocio|concepto)\\s*[:–\\-]\\s*([^\\n\\r|]{3,60}?)(?=${LIMITE_COMERCIO})`,
+    `(?:comercio|establecimiento|destinatario|beneficiario|negocio|concepto|empresa)\\s*[:–\\-]?\\s*([^\\n\\r|]{3,60}?)(?=${LIMITE_COMERCIO})`,
     "i"
   ),
   new RegExp(
@@ -32,6 +43,9 @@ const CAMPOS_COMERCIO = [
     "i"
   ),
 ];
+
+const PREFIJO_CONSUMO_EN =
+  /(?:consumo|compra|pago|transferencia|yape)\s+(?:de\s+)?S\/[0-9][0-9.,]*\s+con\s+(?:tu\s+)?[^.\n\r|]{2,60}?\s+en\s+([A-Za-zÁÉÍÓÚÑáéíóúñ0-9*#][^.\n\r|]{2,50}?)(?=\.|,|\s*(?:Monto|Fecha|Total)|$)/i;
 
 const PATRONES_MOVIMIENTO: Array<{ regex: RegExp; tipo: TipoMovimiento; etiqueta: string }> = [
   { regex: /recibiste\s+un\s+yape\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
@@ -44,7 +58,7 @@ const PATRONES_MOVIMIENTO: Array<{ regex: RegExp; tipo: TipoMovimiento; etiqueta
   { regex: /recibido\b/i, tipo: "ingreso", etiqueta: "Transferencia recibida" },
   { regex: /transferencia\s+de\b/i, tipo: "ingreso", etiqueta: "Transferencia recibida" },
   { regex: /transferencia\s+a\b/i, tipo: "gasto", etiqueta: "Transferencia" },
-  { regex: /(?:compra|consumo)\s+(?:en|con|efectuada)/i, tipo: "gasto", etiqueta: "Compra" },
+  { regex: /(?:compra|consumo)\s+(?:en|con|de|efectuada)/i, tipo: "gasto", etiqueta: "Compra" },
   { regex: /consumo\s+con\s+tarjeta/i, tipo: "gasto", etiqueta: "Consumo tarjeta" },
   { regex: /retiro\s+en/i, tipo: "gasto", etiqueta: "Retiro" },
   { regex: /recarga\b/i, tipo: "gasto", etiqueta: "Recarga" },
@@ -128,6 +142,12 @@ function extraerComercio(texto: string, monto: number | null): string | null {
     }
   }
 
+  const consumoEn = texto.match(PREFIJO_CONSUMO_EN);
+  if (consumoEn) {
+    const limpio = normalizar(consumoEn[1]);
+    if (limpio.length >= 3) return limpio.slice(0, 60);
+  }
+
   const prefijo = texto.match(PREFIJO_COMERCIO);
   if (prefijo) {
     const limpio = normalizar(prefijo[1]);
@@ -165,20 +185,33 @@ export function parseBcpEmail(input: string): ParseResult {
   const matchMonto = texto.match(MONTO_POR_CAMPO) || texto.match(MONTO_REGEX);
   const monto = matchMonto ? parseMonto(matchMonto[1]) : null;
 
-  const matchFecha = texto.match(FECHA_DMY) || texto.match(FECHA_ISO);
+  const matchFechaLarga = texto.match(FECHA_LARGA);
   let fecha: string | undefined;
-  if (matchFecha) {
-    if (matchFecha[4] !== undefined) {
-      const iso = new Date(
-        Date.UTC(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1]), Number(matchFecha[4]), Number(matchFecha[5]))
-      );
-      if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(matchFecha[0])) {
-      const iso = new Date(Date.UTC(Number(matchFecha[1]), Number(matchFecha[2]) - 1, Number(matchFecha[3])));
-      if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
-    } else {
-      const iso = new Date(Date.UTC(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1])));
-      if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
+  if (matchFechaLarga) {
+    const mes = MESES[matchFechaLarga[2].toLowerCase()];
+    const hora = Number(matchFechaLarga[4] ?? 0);
+    const minuto = Number(matchFechaLarga[5] ?? 0);
+    const esPM = /PM|p\.m\./i.test(matchFechaLarga[6] ?? "");
+    const hora24 = (hora % 12) + (esPM ? 12 : 0);
+    const iso = new Date(
+      Date.UTC(Number(matchFechaLarga[3]), mes - 1, Number(matchFechaLarga[1]), hora24 + PERU_UTC_OFFSET_HORAS, minuto)
+    );
+    if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
+  } else {
+    const matchFecha = texto.match(FECHA_DMY) || texto.match(FECHA_ISO);
+    if (matchFecha) {
+      if (matchFecha[4] !== undefined) {
+        const iso = new Date(
+          Date.UTC(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1]), Number(matchFecha[4]), Number(matchFecha[5]))
+        );
+        if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(matchFecha[0])) {
+        const iso = new Date(Date.UTC(Number(matchFecha[1]), Number(matchFecha[2]) - 1, Number(matchFecha[3])));
+        if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
+      } else {
+        const iso = new Date(Date.UTC(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1])));
+        if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
+      }
     }
   }
 
