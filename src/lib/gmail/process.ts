@@ -71,7 +71,14 @@ export async function procesarCorreosBcp(): Promise<ResultadoProceso> {
         continue;
       }
 
-      const resultado = parseBcpEmail(correo.html || correo.texto);
+      const resultado = parseBcpEmail(correo.html || correo.texto, correo.asunto);
+
+      if (resultado.omitir) {
+        await supabase
+          .from("correos_procesados")
+          .insert({ message_id: messageId, resultado: "omitido", detalle: resultado.movimiento });
+        continue;
+      }
 
       if (!resultado.ok) {
         await supabase.from("gastos_automaticos").insert({

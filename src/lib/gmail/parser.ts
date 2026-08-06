@@ -3,6 +3,7 @@ export type TipoGastoSugerido = "fijo" | "hormiga" | "variable";
 
 export interface ParseResult {
   ok: boolean;
+  omitir?: boolean;
   error?: string;
   monto?: number;
   comercio?: string;
@@ -13,7 +14,8 @@ export interface ParseResult {
 }
 
 const MONTO_REGEX = /S\/\s*([0-9][0-9.,]*)/i;
-const MONTO_POR_CAMPO = /\b(?:monto|importe|total|valor)\s*[:–]?\s*S\/\s*([0-9][0-9.,]*)/i;
+const MONTO_POR_CAMPO =
+  /\b(?:monto|importe|total|valor)\b(?:(?!S\/).){0,20}?\bS\/\s*([0-9][0-9.,]*)/i;
 const FECHA_DMY = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:\s+(\d{1,2}):(\d{2}))?/;
 const FECHA_ISO = /(\d{4})-(\d{2})-(\d{2})/;
 
@@ -23,59 +25,77 @@ const MESES: Record<string, number> = {
   noviembre: 11, diciembre: 12,
 };
 const FECHA_LARGA = new RegExp(
-  `(\\d{1,2})\\s+de\\s+(${Object.keys(MESES).join("|")})\\s+de\\s+(\\d{4})(?:\\s*[-–]\\s*(\\d{1,2}):(\\d{2})\\s*(AM|PM|a\\.m\\.|p\\.m\\.))?`,
+  `(?<dia>\\d{1,2})\\s+(?:de\\s+)?(?<mes>${Object.keys(MESES).join("|")})\\s+(?:de\\s+)?(?<anio>\\d{4})(?:\\s*[-–]\\s*(?<hora>\\d{1,2}):(?<min>\\d{2})(?::\\d{2})?\\s*(?<ampm>(?:A|P)\\.?\\s*M\\.?)?)?`,
   "i"
 );
 const PERU_UTC_OFFSET_HORAS = 5;
 
-const LABEL_SIGUIENTE =
-  /\s(?:S\/|monto\b|fecha\b|hora\b|c[oó]digo\b|operaci[oó]n\b|referencia\b|estado\b|n[uú]mero\b|tipo\b)/i;
-
-const LIMITE_COMERCIO = "(?:\\s*S\\/|\\s*(?:monto|fecha|hora|c[oó]digo|operaci[oó]n|referencia|estado|n[uú]mero|tipo)\\b|$)";
+const LIMITE_COMERCIO =
+  "(?:\\s*S\\/|\\s*(?:monto|importe|total|fecha|hora|c[oó]digo|operaci[oó]n|referencia|estado|n[uú]mero|tipo|servicio|titular|comisi[oó]n|cuenta|vigencia|valor|igv|subtotal|moneda|destino|desde|canal|mensaje|enviado|empresa|recibido|emitido)\\b|$)";
 
 const CAMPOS_COMERCIO = [
   new RegExp(
     `(?:comercio|establecimiento|destinatario|beneficiario|negocio|concepto|empresa)\\s*[:–\\-]?\\s*([^\\n\\r|]{3,60}?)(?=${LIMITE_COMERCIO})`,
     "i"
   ),
-  new RegExp(
-    `(?:yapeaste\\s+a|recibiste\\s+un\\s+yape\\s+de|recibiste\\s+un\\s+yapeo\\s+de)\\s*[:–\\-]?\\s*([^\\n\\r|]{3,60}?)(?=${LIMITE_COMERCIO})`,
-    "i"
-  ),
 ];
+
+const PREFIJO_YAPE_RECIBIDO_DE =
+  /recibiste\s+un\s+yapeo?\s+de\s+S\/\s*[0-9][0-9.,]*\s+de\s+([A-Za-zÁÉÍÓÚÑáéíóúñ][^\n\r|]{2,50}?)(?=\.|$|Monto|Fecha)/i;
+
+const PREFIJO_ENVIADO_A =
+  /enviado\s+a\s+([A-Za-zÁÉÍÓÚÑáéíóúñ0-9*#][^\n\r|]{2,60}?)(?=\.(?:\s|$))/i;
+
+const PREFIJO_WARDADITO =
+  /en\s+tu\s+wardadito\s+([A-Za-zÁÉÍÓÚÑáéíóúñ0-9][^\n\r|.]{2,30}?)(?=\.|$)/i;
 
 const PREFIJO_CONSUMO_EN =
-  /(?:consumo|compra|pago|transferencia|yape)\s+(?:de\s+)?S\/[0-9][0-9.,]*\s+con\s+(?:tu\s+)?[^.\n\r|]{2,60}?\s+en\s+([A-Za-zÁÉÍÓÚÑáéíóúñ0-9*#][^.\n\r|]{2,50}?)(?=\.|,|\s*(?:Monto|Fecha|Total)|$)/i;
-
-const PATRONES_MOVIMIENTO: Array<{ regex: RegExp; tipo: TipoMovimiento; etiqueta: string }> = [
-  { regex: /recibiste\s+un\s+yape\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
-  { regex: /yape\s+de\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
-  { regex: /yapeo\s+de\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
-  { regex: /yape\s+recibido\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
-  { regex: /yapeo\s+a\b|yapeaste\s+a\b/i, tipo: "gasto", etiqueta: "Yapeo" },
-  { regex: /devoluci[oó]n/i, tipo: "ingreso", etiqueta: "Devolución" },
-  { regex: /abono\b/i, tipo: "ingreso", etiqueta: "Abono" },
-  { regex: /recibido\b/i, tipo: "ingreso", etiqueta: "Transferencia recibida" },
-  { regex: /transferencia\s+de\b/i, tipo: "ingreso", etiqueta: "Transferencia recibida" },
-  { regex: /transferencia\s+a\b/i, tipo: "gasto", etiqueta: "Transferencia" },
-  { regex: /(?:compra|consumo)\s+(?:en|con|de|efectuada)/i, tipo: "gasto", etiqueta: "Compra" },
-  { regex: /consumo\s+con\s+tarjeta/i, tipo: "gasto", etiqueta: "Consumo tarjeta" },
-  { regex: /retiro\s+en/i, tipo: "gasto", etiqueta: "Retiro" },
-  { regex: /recarga\b/i, tipo: "gasto", etiqueta: "Recarga" },
-  { regex: /plin\b/i, tipo: "gasto", etiqueta: "Plin" },
-  { regex: /pago\b/i, tipo: "gasto", etiqueta: "Pago" },
-];
-
-const RECURRENTES =
-  /luz|agua|internet|tel[eé]fono|plan\b|suscripci[oó]n|colegiatura|pensi[oón]|gimnasio|alquiler|renta|netflix|spotify|membres[ií]a|seguro/i;
+  /(?:consumo|compra|pago|transferencia|yape)\s+(?:de\s+)?S\/\s*[0-9][0-9.,]*\s+con\s+(?:tu\s+)?[^.\n\r|]{2,60}?\s+en\s+([A-Za-zÁÉÍÓÚÑáéíóúñ0-9*#][^.\n\r|]{2,50}?)(?=\.|,|\s*(?:Monto|Fecha|Total)|$)/i;
 
 const PREFIJO_COMERCIO = new RegExp(
   `(?:yapeo a|yapeaste a|pago(?: a| de)?|compra en|consumo en|transferencia a|recarga(?: yape)?|retiro en|en el establecimiento|recibiste un yape de)\\s*[:–\\-]?\\s+([A-Za-zÁÉÍÓÚÑáéíóúñ0-9][^\\n\\r|]{2,50}?)(?=${LIMITE_COMERCIO})`,
   "i"
 );
 
+const RECURRENTES =
+  /luz|agua|internet|tel[eé]fono|plan\b|suscripci[oó]n|colegiatura|pensi[oó]n|gimnasio|alquiler|renta|netflix|spotify|membres[ií]a|seguro|bitel|claro|movistar|entel/i;
+
+const REGLAS_MOVIMIENTO: Array<{
+  regex: RegExp;
+  tipo: TipoMovimiento | "omitir";
+  etiqueta: string;
+}> = [
+  { regex: /transferencia\s+entre\s+mis\s+cuentas/i, tipo: "omitir", etiqueta: "Transferencia interna" },
+  {
+    regex: /(?:no\s+te\s+olvides|recuerda\s+que\s+tu)[^.]{0,80}(?:d[ée]bito|aporte|autom[áa]tico)/i,
+    tipo: "omitir",
+    etiqueta: "Recordatorio débito automático",
+  },
+  { regex: /recibiste\s+un\s+yapeo?\s+de\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
+  { regex: /recepci[óo]n\s+de\s+yapeo\s+a\s+celular/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
+  { regex: /yape\s+recibido\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
+  { regex: /devoluci[óo]n\s+de\b/i, tipo: "ingreso", etiqueta: "Devolución" },
+  { regex: /recibiste\s+una\s+transferencia\s+de\b/i, tipo: "ingreso", etiqueta: "Transferencia recibida" },
+  { regex: /abono\s+(?:de\s+)?S\//i, tipo: "ingreso", etiqueta: "Abono" },
+  { regex: /pago\s+con\s+qr/i, tipo: "gasto", etiqueta: "Pago QR" },
+  { regex: /realizaste\s+un\s+yapeo\s+a\s+celular\b/i, tipo: "gasto", etiqueta: "Yapeo" },
+  { regex: /yapeo\s+a\s+celular\s+de\s+S\//i, tipo: "gasto", etiqueta: "Yapeo" },
+  { regex: /constancia\s+de\s+yapeo\s+a\s+celular/i, tipo: "gasto", etiqueta: "Yapeo" },
+  { regex: /realizaste\s+un\s+consumo\b|consumo\s+con\s+tu\s+tarjeta/i, tipo: "gasto", etiqueta: "Consumo" },
+  { regex: /pago\s+de\s+servicio/i, tipo: "gasto", etiqueta: "Pago de servicio" },
+  { regex: /retiro\s+de\s+tu\s+wardadito|realizaste\s+un\s+retiro\b|retiro\s+en\b/i, tipo: "gasto", etiqueta: "Retiro" },
+  { regex: /transferencia\s+a\b/i, tipo: "gasto", etiqueta: "Transferencia" },
+  { regex: /recarga\b/i, tipo: "gasto", etiqueta: "Recarga" },
+  { regex: /plin\b/i, tipo: "gasto", etiqueta: "Plin" },
+  { regex: /compra\b|consumo\b/i, tipo: "gasto", etiqueta: "Compra" },
+  { regex: /pago\b/i, tipo: "gasto", etiqueta: "Pago" },
+];
+
 export function htmlToText(html: string): string {
   return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, " ")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/(?:p|div|tr|h[1-6]|li|table)>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
@@ -90,149 +110,122 @@ export function htmlToText(html: string): string {
     .trim();
 }
 
-function parseMonto(raw: string): number | null {
-  const s = raw.trim().replace(/\s+/g, "");
-  if (!s || !/^[0-9.,]+$/.test(s)) return null;
-
-  const hasDot = s.includes(".");
-  const hasComma = s.includes(",");
-  let decimal: string | null = null;
-
-  if (hasDot && hasComma) {
-    decimal = s.lastIndexOf(",") > s.lastIndexOf(".") ? "," : ".";
-  } else if (hasComma) {
-    const idx = s.lastIndexOf(",");
-    decimal = s.length - idx - 1 === 3 ? null : ",";
-  } else if (hasDot) {
-    const idx = s.lastIndexOf(".");
-    decimal = s.length - idx - 1 === 3 ? null : ".";
-  }
-
-  if (decimal) {
-    const sep = decimal === "," ? "," : ".";
-    const otroSep = decimal === "," ? "." : ",";
-    const [intPart, decPart] = s.split(sep);
-    const entero = Number(intPart.split(otroSep).join(""));
-    const decimalN = Number("0." + decPart);
-    return entero + decimalN;
-  }
-
-  return Number(s.split(".").join("").split(",").join(""));
+export function parsearMonto(texto: string): number | undefined {
+  const m = MONTO_POR_CAMPO.exec(texto) ?? MONTO_REGEX.exec(texto);
+  if (!m) return undefined;
+  const n = Number(m[1].replace(/,/g, ""));
+  return Number.isFinite(n) ? n : undefined;
 }
 
-function limpiar(texto: string): string {
-  return texto
-    .replace(/\s+/g, " ")
-    .replace(/^[:\s\-–|]+/, "")
-    .replace(/[:\s\-–|]+$/, "")
+export function parsearFecha(texto: string): string | undefined {
+  const larga = FECHA_LARGA.exec(texto);
+  if (larga?.groups) {
+    const { dia, mes, anio, hora, min, ampm } = larga.groups;
+    const numeroMes = MESES[mes.toLowerCase()];
+    if (!numeroMes) return undefined;
+    let h = hora ? Number(hora) : 0;
+    if (ampm && /^p/i.test(ampm)) h = h < 12 ? h + 12 : h;
+    if (ampm && /^a/i.test(ampm)) h = h === 12 ? 0 : h;
+    return new Date(
+      Date.UTC(
+        Number(anio),
+        numeroMes - 1,
+        Number(dia),
+        h + PERU_UTC_OFFSET_HORAS,
+        Number(min || 0)
+      )
+    ).toISOString();
+  }
+
+  const dmy = FECHA_DMY.exec(texto);
+  if (dmy) {
+    return new Date(
+      Date.UTC(
+        Number(dmy[3]),
+        Number(dmy[2]) - 1,
+        Number(dmy[1]),
+        Number(dmy[4] || 0) + PERU_UTC_OFFSET_HORAS,
+        Number(dmy[5] || 0)
+      )
+    ).toISOString();
+  }
+
+  const iso = FECHA_ISO.exec(texto);
+  if (iso) {
+    return new Date(
+      Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]), PERU_UTC_OFFSET_HORAS)
+    ).toISOString();
+  }
+
+  return undefined;
+}
+
+function limpiarComercio(s: string): string {
+  return s
+    .replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9*#]+/, "")
+    .replace(/\s+[a-f0-9]{8,}\s*/gi, " ")
+    .replace(/[.,;:\s]+$/g, "")
     .trim();
 }
 
-function extraerComercio(texto: string, monto: number | null): string | null {
-  const normalizar = (s: string): string => {
-    const limpio = limpiar(s).split(LABEL_SIGUIENTE)[0];
-    return limpiar(limpio);
-  };
-
-  for (const campo of CAMPOS_COMERCIO) {
-    const m = texto.match(campo);
-    if (m) {
-      const limpio = normalizar(m[1]);
-      if (limpio.length >= 3) return limpio.slice(0, 60);
-    }
+export function extraerComercio(texto: string): string | undefined {
+  for (const re of [
+    PREFIJO_YAPE_RECIBIDO_DE,
+    PREFIJO_ENVIADO_A,
+    PREFIJO_WARDADITO,
+    PREFIJO_CONSUMO_EN,
+    ...CAMPOS_COMERCIO,
+    PREFIJO_COMERCIO,
+  ]) {
+    const m = re.exec(texto);
+    if (m && m[1]) return limpiarComercio(m[1]);
   }
-
-  const consumoEn = texto.match(PREFIJO_CONSUMO_EN);
-  if (consumoEn) {
-    const limpio = normalizar(consumoEn[1]);
-    if (limpio.length >= 3) return limpio.slice(0, 60);
-  }
-
-  const prefijo = texto.match(PREFIJO_COMERCIO);
-  if (prefijo) {
-    const limpio = normalizar(prefijo[1]);
-    if (limpio.length >= 3) return limpio.slice(0, 60);
-  }
-
-  if (monto !== null) {
-    const idx = texto.search(MONTO_REGEX);
-    if (idx > 0) {
-      const antes = normalizar(texto.slice(Math.max(0, idx - 60), idx));
-      if (antes.length >= 3 && antes.length <= 60) return antes;
-    }
-  }
-
-  return null;
+  return undefined;
 }
 
-function sugerirTipo(texto: string, comercio: string, monto: number): TipoGastoSugerido {
-  if (RECURRENTES.test(`${texto} ${comercio}`)) return "fijo";
-  if (monto < 25) return "hormiga";
-  return "variable";
+export function clasificarMovimiento(
+  texto: string,
+  asunto?: string
+): { tipo: TipoMovimiento; omitir: boolean; etiqueta: string } {
+  const fuente = `${asunto ?? ""}\n${texto}`;
+  for (const regla of REGLAS_MOVIMIENTO) {
+    if (regla.regex.test(fuente)) {
+      return {
+        tipo: regla.tipo === "omitir" ? "gasto" : regla.tipo,
+        omitir: regla.tipo === "omitir",
+        etiqueta: regla.etiqueta,
+      };
+    }
+  }
+  return { tipo: "gasto", omitir: false, etiqueta: "Movimiento" };
 }
 
-export function parseBcpEmail(input: string): ParseResult {
+export function parseBcpEmail(input: string, asunto?: string): ParseResult {
   const texto = htmlToText(input);
+  const { tipo, omitir, etiqueta } = clasificarMovimiento(texto, asunto);
+  if (omitir) return { ok: false, omitir: true, movimiento: etiqueta };
 
-  let movimiento: { tipo: TipoMovimiento; etiqueta: string } | null = null;
-  for (const p of PATRONES_MOVIMIENTO) {
-    if (p.regex.test(texto)) {
-      movimiento = { tipo: p.tipo, etiqueta: p.etiqueta };
-      break;
-    }
+  const monto = parsearMonto(texto);
+  if (monto === undefined) {
+    return {
+      ok: false,
+      error: "No se encontró un monto S/ en el correo",
+      movimiento: etiqueta,
+    };
   }
 
-  const matchMonto = texto.match(MONTO_POR_CAMPO) || texto.match(MONTO_REGEX);
-  const monto = matchMonto ? parseMonto(matchMonto[1]) : null;
-
-  const matchFechaLarga = texto.match(FECHA_LARGA);
-  let fecha: string | undefined;
-  if (matchFechaLarga) {
-    const mes = MESES[matchFechaLarga[2].toLowerCase()];
-    const hora = Number(matchFechaLarga[4] ?? 0);
-    const minuto = Number(matchFechaLarga[5] ?? 0);
-    const esPM = /PM|p\.m\./i.test(matchFechaLarga[6] ?? "");
-    const hora24 = (hora % 12) + (esPM ? 12 : 0);
-    const iso = new Date(
-      Date.UTC(Number(matchFechaLarga[3]), mes - 1, Number(matchFechaLarga[1]), hora24 + PERU_UTC_OFFSET_HORAS, minuto)
-    );
-    if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
-  } else {
-    const matchFecha = texto.match(FECHA_DMY) || texto.match(FECHA_ISO);
-    if (matchFecha) {
-      if (matchFecha[4] !== undefined) {
-        const iso = new Date(
-          Date.UTC(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1]), Number(matchFecha[4]), Number(matchFecha[5]))
-        );
-        if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
-      } else if (/^\d{4}-\d{2}-\d{2}$/.test(matchFecha[0])) {
-        const iso = new Date(Date.UTC(Number(matchFecha[1]), Number(matchFecha[2]) - 1, Number(matchFecha[3])));
-        if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
-      } else {
-        const iso = new Date(Date.UTC(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1])));
-        if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
-      }
-    }
-  }
-
-  const comercio = extraerComercio(texto, monto);
-
-  if (monto === null) {
-    return { ok: false, error: "No se encontró un monto en formato S/ x.xx" };
-  }
-  if (!comercio) {
-    return { ok: false, error: "No se pudo identificar el comercio o destinatario" };
-  }
-
-  const tipoMovimiento = movimiento?.tipo ?? "gasto";
+  const comercio = extraerComercio(texto);
+  const fecha = parsearFecha(texto);
+  const tipoGastoSugerido =
+    tipo === "gasto" && RECURRENTES.test(comercio ?? "") ? "fijo" : "hormiga";
 
   return {
     ok: true,
     monto,
     comercio,
     fecha,
-    tipoMovimiento,
-    movimiento: movimiento?.etiqueta,
-    tipoGastoSugerido: tipoMovimiento === "gasto" ? sugerirTipo(texto, comercio, monto) : undefined,
+    tipoMovimiento: tipo,
+    tipoGastoSugerido,
+    movimiento: etiqueta,
   };
 }
