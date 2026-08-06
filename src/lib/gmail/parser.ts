@@ -13,16 +13,32 @@ export interface ParseResult {
 }
 
 const MONTO_REGEX = /S\/\s*([0-9][0-9.,]*)/i;
+const MONTO_POR_CAMPO = /\b(?:monto|importe|total|valor)\s*[:–]?\s*S\/\s*([0-9][0-9.,]*)/i;
 const FECHA_DMY = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:\s+(\d{1,2}):(\d{2}))?/;
 const FECHA_ISO = /(\d{4})-(\d{2})-(\d{2})/;
 
+const LABEL_SIGUIENTE =
+  /\s(?:S\/|monto\b|fecha\b|hora\b|c[oó]digo\b|operaci[oó]n\b|referencia\b|estado\b|n[uú]mero\b|tipo\b)/i;
+
+const LIMITE_COMERCIO = "(?:\\s*S\\/|\\s*(?:monto|fecha|hora|c[oó]digo|operaci[oó]n|referencia|estado|n[uú]mero|tipo)\\b|$)";
+
 const CAMPOS_COMERCIO = [
-  /(?:comercio|establecimiento|destinatario|beneficiario|negocio|concepto)\s*[:–\-]\s*([^\n\r|]{3,60})/i,
+  new RegExp(
+    `(?:comercio|establecimiento|destinatario|beneficiario|negocio|concepto)\\s*[:–\\-]\\s*([^\\n\\r|]{3,60}?)(?=${LIMITE_COMERCIO})`,
+    "i"
+  ),
+  new RegExp(
+    `(?:yapeaste\\s+a|recibiste\\s+un\\s+yape\\s+de|recibiste\\s+un\\s+yapeo\\s+de)\\s*[:–\\-]?\\s*([^\\n\\r|]{3,60}?)(?=${LIMITE_COMERCIO})`,
+    "i"
+  ),
 ];
 
 const PATRONES_MOVIMIENTO: Array<{ regex: RegExp; tipo: TipoMovimiento; etiqueta: string }> = [
-  { regex: /yapeo\s+a\b/i, tipo: "gasto", etiqueta: "Yapeo" },
+  { regex: /recibiste\s+un\s+yape\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
+  { regex: /yape\s+de\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
   { regex: /yapeo\s+de\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
+  { regex: /yape\s+recibido\b/i, tipo: "ingreso", etiqueta: "Yapeo recibido" },
+  { regex: /yapeo\s+a\b|yapeaste\s+a\b/i, tipo: "gasto", etiqueta: "Yapeo" },
   { regex: /devoluci[oó]n/i, tipo: "ingreso", etiqueta: "Devolución" },
   { regex: /abono\b/i, tipo: "ingreso", etiqueta: "Abono" },
   { regex: /recibido\b/i, tipo: "ingreso", etiqueta: "Transferencia recibida" },
@@ -39,8 +55,10 @@ const PATRONES_MOVIMIENTO: Array<{ regex: RegExp; tipo: TipoMovimiento; etiqueta
 const RECURRENTES =
   /luz|agua|internet|tel[eé]fono|plan\b|suscripci[oó]n|colegiatura|pensi[oón]|gimnasio|alquiler|renta|netflix|spotify|membres[ií]a|seguro/i;
 
-const PREFIJO_COMERCIO =
-  /(?:yapeo a|pago(?: a| de)?|compra en|consumo en|transferencia a|recarga(?: yape)?|retiro en|en el establecimiento)\s+([A-Za-zÁÉÍÓÚÑáéíóúñ0-9][^\n\r|]{2,50})/i;
+const PREFIJO_COMERCIO = new RegExp(
+  `(?:yapeo a|yapeaste a|pago(?: a| de)?|compra en|consumo en|transferencia a|recarga(?: yape)?|retiro en|en el establecimiento|recibiste un yape de)\\s*[:–\\-]?\\s+([A-Za-zÁÉÍÓÚÑáéíóúñ0-9][^\\n\\r|]{2,50}?)(?=${LIMITE_COMERCIO})`,
+  "i"
+);
 
 export function htmlToText(html: string): string {
   return html
@@ -97,24 +115,29 @@ function limpiar(texto: string): string {
 }
 
 function extraerComercio(texto: string, monto: number | null): string | null {
+  const normalizar = (s: string): string => {
+    const limpio = limpiar(s).split(LABEL_SIGUIENTE)[0];
+    return limpiar(limpio);
+  };
+
   for (const campo of CAMPOS_COMERCIO) {
     const m = texto.match(campo);
     if (m) {
-      const limpio = limpiar(m[1]);
+      const limpio = normalizar(m[1]);
       if (limpio.length >= 3) return limpio.slice(0, 60);
     }
   }
 
   const prefijo = texto.match(PREFIJO_COMERCIO);
   if (prefijo) {
-    const limpio = limpiar(prefijo[1]);
+    const limpio = normalizar(prefijo[1]);
     if (limpio.length >= 3) return limpio.slice(0, 60);
   }
 
   if (monto !== null) {
     const idx = texto.search(MONTO_REGEX);
     if (idx > 0) {
-      const antes = limpiar(texto.slice(Math.max(0, idx - 60), idx));
+      const antes = normalizar(texto.slice(Math.max(0, idx - 60), idx));
       if (antes.length >= 3 && antes.length <= 60) return antes;
     }
   }
@@ -139,7 +162,7 @@ export function parseBcpEmail(input: string): ParseResult {
     }
   }
 
-  const matchMonto = texto.match(MONTO_REGEX);
+  const matchMonto = texto.match(MONTO_POR_CAMPO) || texto.match(MONTO_REGEX);
   const monto = matchMonto ? parseMonto(matchMonto[1]) : null;
 
   const matchFecha = texto.match(FECHA_DMY) || texto.match(FECHA_ISO);
@@ -147,18 +170,14 @@ export function parseBcpEmail(input: string): ParseResult {
   if (matchFecha) {
     if (matchFecha[4] !== undefined) {
       const iso = new Date(
-        Number(matchFecha[3]),
-        Number(matchFecha[2]) - 1,
-        Number(matchFecha[1]),
-        Number(matchFecha[4]),
-        Number(matchFecha[5])
+        Date.UTC(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1]), Number(matchFecha[4]), Number(matchFecha[5]))
       );
       if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
     } else if (/^\d{4}-\d{2}-\d{2}$/.test(matchFecha[0])) {
-      const iso = new Date(Number(matchFecha[1]), Number(matchFecha[2]) - 1, Number(matchFecha[3]));
+      const iso = new Date(Date.UTC(Number(matchFecha[1]), Number(matchFecha[2]) - 1, Number(matchFecha[3])));
       if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
     } else {
-      const iso = new Date(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1]));
+      const iso = new Date(Date.UTC(Number(matchFecha[3]), Number(matchFecha[2]) - 1, Number(matchFecha[1])));
       if (!Number.isNaN(iso.getTime())) fecha = iso.toISOString();
     }
   }
