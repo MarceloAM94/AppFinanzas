@@ -44,3 +44,27 @@ export interface GastoFijo {
   deleted_at: string | null;
   pagado?: boolean;
 }
+
+export interface GastoAutomatico {
+  id: string;
+  monto: number | null;
+  comercio: string | null;
+  fecha: string | null;
+  origen: string;
+  estado: "pendiente" | "confirmado" | "descartado" | "error_parseo";
+  tipo_gasto_sugerido: "fijo" | "hormiga" | "variable" | null;
+  message_id: string;
+  cuerpo_html: string | null;
+  parse_error: string | null;
+  creado_en: string;
+}
+
+export interface Integracion {
+  id: string;
+  servicio: string;
+  email: string | null;
+  conectado: boolean;
+  ultima_revision: string | null;
+  created_at: string;
+  updated_at: string;
+}

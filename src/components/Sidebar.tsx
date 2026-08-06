@@ -1,20 +1,30 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
+import { contarGastosPendientes } from "@/lib/actions/gastos-automaticos";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icono: "📊" },
   { href: "/ingresos", label: "Ingresos", icono: "💰" },
   { href: "/gastos", label: "Gastos", icono: "💸" },
   { href: "/gastos-fijos", label: "Gastos Fijos", icono: "🔁" },
+  { href: "/gastos-pendientes", label: "Pendientes", icono: "⏳" },
   { href: "/categorias", label: "Categorías", icono: "🏷️" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const { drawerAbierto, toggleDrawer } = useAppStore();
+  const [pendientes, setPendientes] = useState(0);
+
+  useEffect(() => {
+    contarGastosPendientes()
+      .then(setPendientes)
+      .catch(() => {});
+  }, [pathname]);
 
   return (
     <>
@@ -82,6 +92,11 @@ export default function Sidebar() {
                 >
                   <span className="text-lg">{item.icono}</span>
                   {item.label}
+                  {item.href === "/gastos-pendientes" && pendientes > 0 && (
+                    <span className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+                      {pendientes}
+                    </span>
+                  )}
                 </Link>
               );
             })}

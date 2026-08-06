@@ -86,7 +86,7 @@ export async function gastosPorCategoria(mes: number, anio: number) {
   const agrupado: Record<string, { categoria: string; icono_color: string; total: number }> = {};
 
   for (const g of gastos) {
-    const cat = (g as any).categorias;
+    const cat = g.categorias as { nombre: string; icono_color: string | null } | undefined;
     const key = g.categoria_id;
     if (!agrupado[key]) {
       agrupado[key] = {
