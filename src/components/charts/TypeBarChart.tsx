@@ -32,7 +32,7 @@ export default function TypeBarChart({ data }: Props) {
   const todosCeros = data.every((d) => d.fijo === 0 && d.hormiga === 0 && d.variable === 0);
   if (todosCeros) {
     return (
-      <div className="flex h-[220px] items-center justify-center text-sm text-gray-400 sm:h-[280px]">
+      <div className="flex h-[220px] items-center justify-center text-sm text-muted sm:h-[280px]">
         Sin datos este año
       </div>
     );
@@ -48,17 +48,40 @@ export default function TypeBarChart({ data }: Props) {
   return (
     <ResponsiveContainer width="100%" height={isMobile ? 220 : 280}>
       <BarChart data={datos}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis dataKey="name" tick={{ fontSize: isMobile ? 10 : 12 }} interval={isMobile ? 1 : 0} />
-        <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} tickFormatter={(v) => isMobile ? `${v}` : `S/ ${v}`} width={isMobile ? 45 : 70} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#2b3139" />
+        <XAxis
+          dataKey="name"
+          tick={{ fontSize: isMobile ? 10 : 12, fill: "#707a8a" }}
+          interval={isMobile ? 1 : 0}
+          axisLine={{ stroke: "#2b3139" }}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: isMobile ? 10 : 12, fill: "#707a8a" }}
+          tickFormatter={(v) => (isMobile ? `${v}` : `S/ ${v}`)}
+          width={isMobile ? 45 : 70}
+          axisLine={false}
+          tickLine={false}
+        />
         <Tooltip
           formatter={(value) => formatearMoneda(Number(value))}
-          contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "12px" }}
+          contentStyle={{
+            borderRadius: "8px",
+            border: "1px solid #2b3139",
+            background: "#1e2329",
+            color: "#eaecef",
+            fontSize: "12px",
+          }}
+          labelStyle={{ color: "#929aa5" }}
         />
-        <Legend iconType="circle" iconSize={isMobile ? 6 : 8} wrapperStyle={{ fontSize: isMobile ? "11px" : "12px" }} />
-        <Bar dataKey="Fijo" fill="#EF4444" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Hormiga" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="Variable" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+        <Legend
+          iconType="circle"
+          iconSize={isMobile ? 6 : 8}
+          wrapperStyle={{ fontSize: isMobile ? "11px" : "12px", color: "#929aa5" }}
+        />
+        <Bar dataKey="Fijo" fill="#929aa5" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Hormiga" fill="#fcd535" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="Variable" fill="#3b82f6" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

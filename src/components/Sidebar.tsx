@@ -5,15 +5,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
 import { contarGastosPendientes } from "@/lib/actions/gastos-automaticos";
+import {
+  LayoutDashboard,
+  ArrowDownLeft,
+  ArrowUpRight,
+  RefreshCw,
+  Tag,
+  Hourglass,
+  Menu,
+  X,
+} from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icono: "📊" },
-  { href: "/ingresos", label: "Ingresos", icono: "💰" },
-  { href: "/gastos", label: "Gastos", icono: "💸" },
-  { href: "/gastos-fijos", label: "Gastos Fijos", icono: "🔁" },
-  { href: "/gastos-pendientes", label: "Pendientes", icono: "⏳" },
-  { href: "/categorias", label: "Categorías", icono: "🏷️" },
-];
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/ingresos", label: "Ingresos", icon: ArrowDownLeft },
+  { href: "/gastos", label: "Gastos", icon: ArrowUpRight },
+  { href: "/gastos-fijos", label: "Gastos Fijos", icon: RefreshCw },
+  { href: "/gastos-pendientes", label: "Pendientes", icon: Hourglass },
+  { href: "/categorias", label: "Categorías", icon: Tag },
+] as const;
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -28,84 +38,77 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Botón hamburguesa - solo visible en mobile cuando el drawer está cerrado */}
+      {/* Mobile hamburger */}
       <button
         onClick={toggleDrawer}
-        className={`fixed top-4 left-4 z-50 rounded-lg bg-white p-2 shadow-md hover:bg-gray-50 md:hidden ${
+        className={`fixed top-4 left-4 z-50 flex h-10 w-10 items-center justify-center rounded-md bg-surface border border-hairline hover:bg-surface-elevated transition-colors md:hidden ${
           drawerAbierto ? "hidden" : ""
         }`}
         aria-label="Abrir menú"
       >
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
+        <Menu size={18} className="text-body" />
       </button>
 
-      {/* Overlay en mobile */}
+      {/* Overlay */}
       {drawerAbierto && (
-        <div
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
-          onClick={toggleDrawer}
-        />
+        <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={toggleDrawer} />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-full w-64 bg-white shadow-lg transition-transform duration-300 ${
+        className={`fixed top-0 left-0 z-40 flex h-full w-60 flex-col bg-surface border-r border-hairline transition-transform duration-300 ${
           drawerAbierto ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0`}
       >
-        <div className="flex h-full flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 p-4">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">💰</span>
-              <h1 className="text-lg font-bold text-gray-800">Mis Finanzas</h1>
+        {/* Header */}
+        <div className="flex h-14 items-center justify-between border-b border-hairline px-4">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded bg-primary text-on-primary text-xs font-bold">
+              F
             </div>
-            <button
-              onClick={toggleDrawer}
-              className="rounded-lg p-1 hover:bg-gray-100 md:hidden"
-              aria-label="Cerrar menú"
-            >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+            <span className="text-sm font-semibold text-body">Mis Finanzas</span>
+          </Link>
+          <button
+            onClick={toggleDrawer}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted hover:bg-surface-elevated hover:text-body md:hidden transition-colors"
+            aria-label="Cerrar menú"
+          >
+            <X size={16} />
+          </button>
+        </div>
 
-          {/* Navegación */}
-          <nav className="flex-1 space-y-1 p-3">
-            {NAV_ITEMS.map((item) => {
-              const activo = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => {
-                    if (window.innerWidth < 768) toggleDrawer();
-                  }}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                    activo
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  <span className="text-lg">{item.icono}</span>
-                  {item.label}
-                  {item.href === "/gastos-pendientes" && pendientes > 0 && (
-                    <span className="ml-auto rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
-                      {pendientes}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
+        {/* Nav */}
+        <nav className="flex-1 space-y-0.5 p-3">
+          {NAV_ITEMS.map((item) => {
+            const activo = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => {
+                  if (window.innerWidth < 768) toggleDrawer();
+                }}
+                className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors ${
+                  activo
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted hover:bg-surface-elevated hover:text-body"
+                }`}
+              >
+                <item.icon size={18} />
+                <span className="flex-1">{item.label}</span>
+                {item.href === "/gastos-pendientes" && pendientes > 0 && (
+                  <span className="rounded-full bg-down px-2 py-0.5 text-xs font-bold text-white">
+                    {pendientes}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
 
-          {/* Footer */}
-          <div className="border-t border-gray-200 p-4 text-xs text-gray-400">
-            v1.0 — AppFinanzas
-          </div>
+        {/* Footer */}
+        <div className="border-t border-hairline px-4 py-3 text-xs text-muted">
+          v2.0 — AppFinanzas
         </div>
       </aside>
     </>

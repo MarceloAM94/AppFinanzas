@@ -14,13 +14,8 @@ export const TIPOS_GASTO = {
   VARIABLE: "variable",
 } as const;
 
-export const COLORES = {
-  primario: "#3B82F6",
-  secundario: "#6B7280",
-  exito: "#10B981",
-  error: "#EF4444",
-  advertencia: "#F59E0B",
-  fondo: "#F9FAFB",
-  texto: "#111827",
-  textoSecundario: "#6B7280",
+export const TIPOS_GASTO_INFO: Record<string, { label: string; colorClass: string }> = {
+  fijo:     { label: "Fijo",     colorClass: "text-muted-strong" },
+  hormiga:  { label: "Hormiga",  colorClass: "text-primary" },
+  variable: { label: "Variable", colorClass: "text-body" },
 };

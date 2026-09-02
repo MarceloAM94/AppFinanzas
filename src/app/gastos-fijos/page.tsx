@@ -10,6 +10,17 @@ import {
 } from "@/lib/actions/gastos-fijos";
 import { obtenerCategorias } from "@/lib/actions/categorias";
 import type { GastoFijo, Categoria } from "@/types";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import Modal from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import Badge from "@/components/ui/Badge";
+import Skeleton from "@/components/ui/Skeleton";
+import { Plus, Check, Power, CalendarDays } from "lucide-react";
 
 const FRECUENCIAS = [
   { value: "mensual", label: "Mensual", icono: "🔁" },
@@ -17,10 +28,18 @@ const FRECUENCIAS = [
   { value: "semanal", label: "Semanal", icono: "⚡" },
 ] as const;
 
-const FRECUENCIA_MAP: Record<string, { label: string; icono: string }> = {
-  mensual: { label: "Mensual", icono: "🔁" },
-  quincenal: { label: "Quincenal", icono: "🔄" },
-  semanal: { label: "Semanal", icono: "⚡" },
+const FRECUENCIA_LABEL: Record<string, string> = {
+  mensual: "Mensual",
+  quincenal: "Quincenal",
+  semanal: "Semanal",
+};
+
+const emptyForm = {
+  nombre: "",
+  monto_estimado: "",
+  categoria_id: "",
+  dia_del_mes: "1",
+  frecuencia: "mensual" as "semanal" | "quincenal" | "mensual",
 };
 
 export default function GastosFijosPage() {
@@ -28,15 +47,11 @@ export default function GastosFijosPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cargando, setCargando] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [pagando, setPagando] = useState<GastoFijo | null>(null);
+  const [desactivando, setDesactivando] = useState<GastoFijo | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    nombre: "",
-    monto_estimado: "",
-    categoria_id: "",
-    dia_del_mes: "1",
-    frecuencia: "mensual" as "semanal" | "quincenal" | "mensual",
-  });
+  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     cargar();
@@ -62,7 +77,7 @@ export default function GastosFijosPage() {
         parseInt(form.dia_del_mes),
         form.frecuencia
       );
-      setForm({ nombre: "", monto_estimado: "", categoria_id: "", dia_del_mes: "1", frecuencia: "mensual" });
+      setForm(emptyForm);
       setShowForm(false);
       setGuardando(false);
       await cargar();
@@ -72,143 +87,188 @@ export default function GastosFijosPage() {
     }
   }
 
-  async function handlePagar(id: string) {
+  async function confirmarPagar() {
+    if (!pagando) return;
     setError(null);
-    if (!confirm("¿Registrar este gasto fijo como pagado?")) return;
     try {
-      await pagarGastoFijo(id);
+      await pagarGastoFijo(pagando.id);
+      setPagando(null);
       await cargar();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error al pagar");
     }
   }
 
-  async function handleDesactivar(id: string) {
-    if (!confirm("¿Desactivar este gasto fijo?")) return;
-    await desactivarGastoFijo(id);
+  async function confirmarDesactivar() {
+    if (!desactivando) return;
+    await desactivarGastoFijo(desactivando.id);
+    setDesactivando(null);
     await cargar();
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Gastos Fijos</h1>
-        <button
-          onClick={() => { setShowForm(!showForm); setError(null); }}
-          className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
-        >
-          + Nuevo
-        </button>
-      </div>
+      <PageHeader
+        title="Gastos Fijos"
+        action={
+          <Button onClick={() => { setShowForm(true); setError(null); }} icon={<Plus size={16} />}>
+            Nuevo
+          </Button>
+        }
+      />
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-md border border-down/30 bg-down/10 p-4 text-sm text-down">
           {error}
         </div>
       )}
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="animate-fade-slide-in rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">Nuevo Gasto Fijo</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Nombre</label>
-              <input type="text" required value={form.nombre}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                placeholder="Ej: Alquiler" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Monto estimado (S/)</label>
-              <input type="number" step="0.01" required value={form.monto_estimado}
-                onChange={(e) => setForm({ ...form, monto_estimado: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
-              <select value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: e.target.value })} required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                <option value="">Seleccionar...</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>{c.icono_color} {c.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Frecuencia</label>
-              <select value={form.frecuencia} onChange={(e) => setForm({ ...form, frecuencia: e.target.value as typeof form.frecuencia })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                {FRECUENCIAS.map((f) => (
-                  <option key={f.value} value={f.value}>{f.icono} {f.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Día del mes</label>
-              <input type="number" min="1" max="31" required value={form.dia_del_mes}
-                onChange={(e) => setForm({ ...form, dia_del_mes: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-            </div>
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title="Nuevo Gasto Fijo"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Nombre"
+            type="text"
+            required
+            value={form.nombre}
+            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+            placeholder="Ej: Alquiler"
+          />
+          <Input
+            label="Monto estimado (S/)"
+            type="number"
+            step="0.01"
+            required
+            value={form.monto_estimado}
+            onChange={(e) => setForm({ ...form, monto_estimado: e.target.value })}
+          />
+          <Select
+            label="Categoría"
+            value={form.categoria_id}
+            onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
+            required
+          >
+            <option value="">Seleccionar...</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.icono_color} {c.nombre}
+              </option>
+            ))}
+          </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Frecuencia"
+              value={form.frecuencia}
+              onChange={(e) => setForm({ ...form, frecuencia: e.target.value as typeof form.frecuencia })}
+            >
+              {FRECUENCIAS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.icono} {f.label}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Día del mes"
+              type="number"
+              min="1"
+              max="31"
+              required
+              value={form.dia_del_mes}
+              onChange={(e) => setForm({ ...form, dia_del_mes: e.target.value })}
+            />
           </div>
-          <div className="mt-4 flex gap-2">
-            <button type="submit" disabled={guardando} className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50">
-              {guardando ? "Guardando..." : "Agregar"}
-            </button>
-            <button type="button" onClick={() => setShowForm(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
               Cancelar
-            </button>
+            </Button>
+            <Button type="submit" disabled={guardando}>
+              {guardando ? "Guardando..." : "Agregar"}
+            </Button>
           </div>
         </form>
-      )}
+      </Modal>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      {/* Pagar */}
+      <ConfirmDialog
+        open={pagando !== null}
+        onConfirm={confirmarPagar}
+        onCancel={() => setPagando(null)}
+        title="Registrar pago"
+        message={`¿Registrar "${pagando?.nombre}" por ${formatearMoneda(Number(pagando?.monto_estimado) || 0)} como pagado?`}
+        confirmLabel="Pagar"
+        danger={false}
+      />
+
+      {/* Desactivar */}
+      <ConfirmDialog
+        open={desactivando !== null}
+        onConfirm={confirmarDesactivar}
+        onCancel={() => setDesactivando(null)}
+        title="Desactivar gasto fijo"
+        message={`¿Desactivar "${desactivando?.nombre}"?`}
+        confirmLabel="Desactivar"
+      />
+
+      <Card padding="none">
         {cargando ? (
-          <div className="p-6 text-center text-gray-400">Cargando...</div>
-        ) : gastosFijos.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-gray-400">No hay gastos fijos configurados</p>
-            <p className="mt-1 text-xs text-gray-300">Presiona <strong>+ Nuevo</strong> para agregar uno</p>
+          <div className="space-y-2 p-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
           </div>
+        ) : gastosFijos.length === 0 ? (
+          <EmptyState
+            icon={<CalendarDays size={28} className="text-muted" />}
+            title="No hay gastos fijos configurados"
+            description="Presiona + Nuevo para agregar uno"
+          />
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-hairline">
             {gastosFijos.map((gf) => {
-              const freq = FRECUENCIA_MAP[gf.frecuencia] || FRECUENCIA_MAP.mensual;
+              const freq = FRECUENCIA_LABEL[gf.frecuencia] || "Mensual";
               return (
-                <div key={gf.id} className="flex flex-col gap-3 p-4 hover:bg-gray-50 sm:flex-row sm:items-center sm:justify-between">
+                <div key={gf.id} className="flex flex-col gap-3 p-4 hover:bg-surface-elevated/50 transition-colors sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-gray-900">{gf.nombre}</div>
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                    <div className="truncate text-sm font-medium text-body">{gf.nombre}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
                       <span>Día {gf.dia_del_mes}</span>
-                      <span className="hidden sm:inline">•</span>
-                      <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
-                        {freq.icono} {freq.label}
+                      <Badge variant="neutral">{freq}</Badge>
+                      <span className={gf.activo ? "text-up" : "text-muted"}>
+                        {gf.activo ? "Activo" : "Inactivo"}
                       </span>
-                      <span className="hidden sm:inline">•</span>
-                      <span>{gf.activo ? "🟢 Activo" : "🔴 Inactivo"}</span>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-purple-600">{formatearMoneda(Number(gf.monto_estimado))}</span>
+                    <span className="text-sm font-semibold text-body">
+                      {formatearMoneda(Number(gf.monto_estimado))}
+                    </span>
                     {gf.activo && (
                       <>
                         {gf.pagado ? (
-                          <span className="rounded-lg bg-green-50 px-3 py-2 text-xs font-medium text-green-600">
-                            ✅ Pagado
-                          </span>
+                          <Badge variant="up">
+                            <Check size={12} className="mr-1" /> Pagado
+                          </Badge>
                         ) : (
-                          <button
-                            onClick={() => handlePagar(gf.id)}
-                            className="min-h-[44px] rounded-lg bg-green-100 px-4 py-2 text-xs font-medium text-green-700 hover:bg-green-200 active:bg-green-300"
+                          <Button
+                            variant="up"
+                            size="sm"
+                            onClick={() => setPagando(gf)}
+                            icon={<Check size={14} />}
                           >
-                            💳 Pagar
-                          </button>
+                            Pagar
+                          </Button>
                         )}
-                        <button
-                          onClick={() => handleDesactivar(gf.id)}
-                          className="min-h-[44px] rounded-lg bg-gray-100 px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-200 active:bg-gray-300"
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setDesactivando(gf)}
+                          icon={<Power size={14} />}
                         >
                           Desactivar
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>
@@ -217,7 +277,7 @@ export default function GastosFijosPage() {
             })}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

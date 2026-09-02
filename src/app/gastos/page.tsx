@@ -6,6 +6,25 @@ import { formatearMoneda } from "@/utils/formatters";
 import { obtenerGastos, agregarGasto, editarGasto, eliminarGasto } from "@/lib/actions/gastos";
 import { obtenerCategorias } from "@/lib/actions/categorias";
 import type { Gasto, Categoria } from "@/types";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import Modal from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import Badge from "@/components/ui/Badge";
+import Skeleton from "@/components/ui/Skeleton";
+import { Plus, Pencil, Trash2, ReceiptText } from "lucide-react";
+
+const TIPO_INFO: Record<string, { label: string; badge: "neutral" | "primary" | "info" }> = {
+  fijo: { label: "🔁 Fijo", badge: "neutral" },
+  hormiga: { label: "🐜 Hormiga", badge: "primary" },
+  variable: { label: "🛒 Variable", badge: "info" },
+};
+
+const emptyForm = { monto: "", tipo: "variable", categoria_id: "", fecha: "", nota: "" };
 
 export default function GastosPage() {
   const { mesActual, anioActual } = useAppStore();
@@ -14,12 +33,14 @@ export default function GastosPage() {
   const [cargando, setCargando] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState<Gasto | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ monto: "", tipo: "variable", categoria_id: "", fecha: "", nota: "" });
+  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
     cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mesActual, anioActual]);
 
   async function cargar() {
@@ -53,16 +74,17 @@ export default function GastosPage() {
     } else {
       await agregarGasto(datos.monto, datos.tipo, datos.categoria_id, datos.fecha, datos.nota);
     }
-    setForm({ monto: "", tipo: "variable", categoria_id: "", fecha: "", nota: "" });
+    setForm(emptyForm);
     setEditando(null);
     setShowForm(false);
     setGuardando(false);
     await cargar();
   }
 
-  async function handleEliminar(id: string) {
-    if (!confirm("¿Eliminar este gasto?")) return;
-    await eliminarGasto(id);
+  async function confirmarEliminar() {
+    if (!eliminando) return;
+    await eliminarGasto(eliminando.id);
+    setEliminando(null);
     await cargar();
   }
 
@@ -78,107 +100,154 @@ export default function GastosPage() {
     setShowForm(true);
   }
 
-  const TIPO_LABELS: Record<string, string> = { fijo: "🔁 Fijo", hormiga: "🐜 Hormiga", variable: "🛒 Variable" };
+  function abrirNuevo() {
+    setEditando(null);
+    setForm(emptyForm);
+    setShowForm(true);
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Gastos</h1>
-        <button
-          onClick={() => { setShowForm(!showForm); setEditando(null); setForm({ monto: "", tipo: "variable", categoria_id: "", fecha: "", nota: "" }); }}
-          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-        >
-          + Nuevo
-        </button>
-      </div>
+      <PageHeader
+        title="Gastos"
+        action={
+          <Button onClick={abrirNuevo} icon={<Plus size={16} />}>
+            Nuevo
+          </Button>
+        }
+      />
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-md border border-down/30 bg-down/10 p-4 text-sm text-down">
           {error}
         </div>
       )}
 
-      {showForm && (
-        <form onSubmit={handleSubmit} className="animate-fade-slide-in rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">{editando ? "Editar Gasto" : "Nuevo Gasto"}</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Monto (S/)</label>
-              <input type="number" step="0.01" required value={form.monto}
-                onChange={(e) => setForm({ ...form, monto: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Tipo</label>
-              <select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                <option value="fijo">🔁 Fijo</option>
-                <option value="hormiga">🐜 Hormiga</option>
-                <option value="variable">🛒 Variable</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
-              <select value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: e.target.value })} required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none">
-                <option value="">Seleccionar...</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>{c.icono_color} {c.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Fecha</label>
-              <input type="date" required value={form.fecha}
-                onChange={(e) => setForm({ ...form, fecha: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Nota (opcional)</label>
-              <input type="text" value={form.nota}
-                onChange={(e) => setForm({ ...form, nota: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
-            </div>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <button type="submit" disabled={guardando} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
-              {guardando ? "Guardando..." : editando ? "Guardar" : "Agregar"}
-            </button>
-            <button type="button" onClick={() => { setShowForm(false); setEditando(null); }} className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={editando ? "Editar Gasto" : "Nuevo Gasto"}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Monto (S/)"
+            type="number"
+            step="0.01"
+            required
+            value={form.monto}
+            onChange={(e) => setForm({ ...form, monto: e.target.value })}
+          />
+          <Select
+            label="Tipo"
+            value={form.tipo}
+            onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+          >
+            <option value="fijo">🔁 Fijo</option>
+            <option value="hormiga">🐜 Hormiga</option>
+            <option value="variable">🛒 Variable</option>
+          </Select>
+          <Select
+            label="Categoría"
+            value={form.categoria_id}
+            onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
+            required
+          >
+            <option value="">Seleccionar...</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.icono_color} {c.nombre}
+              </option>
+            ))}
+          </Select>
+          <Input
+            label="Fecha"
+            type="date"
+            required
+            value={form.fecha}
+            onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+          />
+          <Input
+            label="Nota (opcional)"
+            type="text"
+            value={form.nota}
+            onChange={(e) => setForm({ ...form, nota: e.target.value })}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
               Cancelar
-            </button>
+            </Button>
+            <Button type="submit" disabled={guardando}>
+              {guardando ? "Guardando..." : editando ? "Guardar" : "Agregar"}
+            </Button>
           </div>
         </form>
-      )}
+      </Modal>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <ConfirmDialog
+        open={eliminando !== null}
+        onConfirm={confirmarEliminar}
+        onCancel={() => setEliminando(null)}
+        title="Eliminar gasto"
+        message={`¿Eliminar "${eliminando?.nota || "este gasto"}" por ${formatearMoneda(Number(eliminando?.monto) || 0)}? Esta acción no se puede deshacer.`}
+      />
+
+      <Card padding="none">
         {cargando ? (
-          <div className="p-6 text-center text-gray-400">Cargando...</div>
-        ) : gastos.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-gray-400">No hay gastos este mes</p>
-            <p className="mt-1 text-xs text-gray-300">Presiona <strong>+ Nuevo</strong> para agregar uno</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {gastos.map((g) => (
-              <div key={g.id} className="flex items-center justify-between gap-3 p-4 hover:bg-gray-50">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-gray-900">{g.nota || "Gasto"}</div>
-                  <div className="text-sm text-gray-500">
-                    {TIPO_LABELS[g.tipo]} • {g.fecha}
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <span className="font-semibold text-red-600">-{formatearMoneda(Number(g.monto))}</span>
-                  <button onClick={() => iniciarEdicion(g)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-blue-600 hover:bg-blue-50 active:bg-blue-100 md:h-9 md:w-9">✏️</button>
-                  <button onClick={() => handleEliminar(g.id)} className="flex h-11 w-11 items-center justify-center rounded-lg text-sm text-red-600 hover:bg-red-50 active:bg-red-100 md:h-9 md:w-9">🗑️</button>
-                </div>
-              </div>
+          <div className="space-y-2 p-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-12" />
             ))}
           </div>
+        ) : gastos.length === 0 ? (
+          <EmptyState
+            icon={<ReceiptText size={28} className="text-muted" />}
+            title="No hay gastos este mes"
+            description="Presiona + Nuevo para agregar uno"
+          />
+        ) : (
+          <div className="divide-y divide-hairline">
+            {gastos.map((g) => {
+              const info = TIPO_INFO[g.tipo];
+              return (
+                <div key={g.id} className="flex items-center justify-between gap-3 p-4 hover:bg-surface-elevated/50 transition-colors">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-body">
+                      {g.nota || "Gasto"}
+                    </div>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+                      <Badge variant={info.badge}>{info.label}</Badge>
+                      <span>{g.fecha}</span>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="text-sm font-semibold text-down">
+                      -{formatearMoneda(Number(g.monto))}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => iniciarEdicion(g)}
+                      icon={<Pencil size={15} />}
+                      className="text-muted hover:text-body"
+                    >
+                      <span className="sr-only">Editar</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEliminando(g)}
+                      icon={<Trash2 size={15} />}
+                      className="text-muted hover:text-down"
+                    >
+                      <span className="sr-only">Eliminar</span>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

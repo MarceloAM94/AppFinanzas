@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { formatearMoneda } from "@/utils/formatters";
 
-const COLORES = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#6B7280"];
+const COLORES = ["#fcd535", "#0ecb81", "#3b82f6", "#f6465d", "#2dbdb6", "#929aa5", "#f0b90b"];
 
 interface Props {
   data: Array<{ categoria: string; icono_color: string; total: number }>;
@@ -22,7 +22,7 @@ export default function CategoryPieChart({ data }: Props) {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center text-sm text-gray-400 sm:h-[280px]">
+      <div className="flex h-[220px] items-center justify-center text-sm text-muted sm:h-[280px]">
         Sin datos este mes
       </div>
     );
@@ -50,13 +50,20 @@ export default function CategoryPieChart({ data }: Props) {
         </Pie>
         <Tooltip
           formatter={(value) => formatearMoneda(Number(value))}
-          contentStyle={{ borderRadius: "8px", border: "1px solid #e5e7eb", fontSize: "12px" }}
+          contentStyle={{
+            borderRadius: "8px",
+            border: "1px solid #2b3139",
+            background: "#1e2329",
+            color: "#eaecef",
+            fontSize: "12px",
+          }}
+          labelStyle={{ color: "#929aa5" }}
         />
         <Legend
           formatter={(value) => `${value}`}
           iconType="circle"
           iconSize={isMobile ? 6 : 8}
-          wrapperStyle={{ fontSize: isMobile ? "11px" : "12px" }}
+          wrapperStyle={{ fontSize: isMobile ? "11px" : "12px", color: "#929aa5" }}
         />
       </PieChart>
     </ResponsiveContainer>
