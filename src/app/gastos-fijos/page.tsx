@@ -127,24 +127,27 @@ export default function GastosFijosPage() {
         open={showForm}
         onClose={() => setShowForm(false)}
         title="Nuevo Gasto Fijo"
+        size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Nombre"
-            type="text"
-            required
-            value={form.nombre}
-            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            placeholder="Ej: Alquiler"
-          />
-          <Input
-            label="Monto estimado (S/)"
-            type="number"
-            step="0.01"
-            required
-            value={form.monto_estimado}
-            onChange={(e) => setForm({ ...form, monto_estimado: e.target.value })}
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Nombre"
+              type="text"
+              required
+              value={form.nombre}
+              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+              placeholder="Ej: Alquiler"
+            />
+            <Input
+              label="Monto estimado (S/)"
+              type="number"
+              step="0.01"
+              required
+              value={form.monto_estimado}
+              onChange={(e) => setForm({ ...form, monto_estimado: e.target.value })}
+            />
+          </div>
           <Select
             label="Categoría"
             value={form.categoria_id}
@@ -158,7 +161,7 @@ export default function GastosFijosPage() {
               </option>
             ))}
           </Select>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Select
               label="Frecuencia"
               value={form.frecuencia}

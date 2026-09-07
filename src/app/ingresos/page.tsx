@@ -106,27 +106,29 @@ export default function IngresosPage() {
         title={editando ? "Editar Ingreso" : "Nuevo Ingreso"}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Monto (S/)"
-            type="number"
-            step="0.01"
-            required
-            value={form.monto}
-            onChange={(e) => setForm({ ...form, monto: e.target.value })}
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Monto (S/)"
+              type="number"
+              step="0.01"
+              required
+              value={form.monto}
+              onChange={(e) => setForm({ ...form, monto: e.target.value })}
+            />
+            <Input
+              label="Fecha"
+              type="date"
+              required
+              value={form.fecha}
+              onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+            />
+          </div>
           <Input
             label="Descripción"
             type="text"
             required
             value={form.descripcion}
             onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-          />
-          <Input
-            label="Fecha"
-            type="date"
-            required
-            value={form.fecha}
-            onChange={(e) => setForm({ ...form, fecha: e.target.value })}
           />
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>

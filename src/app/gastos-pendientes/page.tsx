@@ -12,6 +12,17 @@ import {
 } from "@/lib/actions/gastos-automaticos";
 import { obtenerCategorias } from "@/lib/actions/categorias";
 import type { GastoAutomatico, Integracion, Categoria } from "@/types";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import Modal from "@/components/ui/Modal";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import Badge from "@/components/ui/Badge";
+import Skeleton from "@/components/ui/Skeleton";
+import { RefreshCw, CheckCircle2, XCircle, Mail, AlertTriangle } from "lucide-react";
 
 const TIPO_LABELS: Record<string, string> = { fijo: "🔁 Fijo", hormiga: "🐜 Hormiga", variable: "🛒 Variable" };
 
@@ -37,6 +48,7 @@ export default function GastosPendientesPage() {
   });
   const [guardando, setGuardando] = useState(false);
 
+  const [descartando, setDescartando] = useState<GastoAutomatico | null>(null);
   const [procesando, setProcesando] = useState(false);
 
   useEffect(() => {
@@ -111,11 +123,12 @@ export default function GastosPendientesPage() {
     setGuardando(false);
   }
 
-  async function handleDescartar(pendiente: GastoAutomatico) {
-    if (!confirm(`¿Descartar "${pendiente.comercio || "este gasto"}"?`)) return;
+  async function confirmarDescartar() {
+    if (!descartando) return;
     setError(null);
     try {
-      await descartarGastoAutomatico(pendiente.id);
+      await descartarGastoAutomatico(descartando.id);
+      setDescartando(null);
       await cargar();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al descartar");
@@ -147,225 +160,246 @@ export default function GastosPendientesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Gastos pendientes</h1>
-        {integracion?.conectado && (
-          <button
-            onClick={handleProcesarAhora}
-            disabled={procesando}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            {procesando ? "Procesando..." : "Procesar ahora"}
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Gastos pendientes"
+        action={
+          integracion?.conectado && (
+            <Button
+              onClick={handleProcesarAhora}
+              disabled={procesando}
+              icon={<RefreshCw size={16} className={procesando ? "animate-spin" : ""} />}
+            >
+              {procesando ? "Procesando..." : "Procesar ahora"}
+            </Button>
+          )
+        }
+      />
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+        <div className="rounded-md border border-down/30 bg-down/10 p-4 text-sm text-down">{error}</div>
       )}
       {aviso && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-700">{aviso}</div>
+        <div className="rounded-md border border-up/30 bg-up/10 p-4 text-sm text-up">{aviso}</div>
       )}
 
       {/* Conexión Gmail */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-800">Conexión con Gmail</h2>
+      <Card>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-info/10 text-info">
+            <Mail size={18} />
+          </div>
+          <h2 className="text-sm font-medium text-body">Conexión con Gmail</h2>
+        </div>
         {integracion?.conectado ? (
-          <div className="mt-3 space-y-1 text-sm text-gray-600">
-            <p>✅ Conectado a <span className="font-medium">{integracion.email}</span></p>
-            <p>Última revisión: {integracion.ultima_revision ? new Date(integracion.ultima_revision).toLocaleString() : "aún no se procesa"}</p>
-            <p className="text-xs text-gray-400">
+          <div className="space-y-1 text-sm text-muted">
+            <p>
+              <span className="text-up">✓</span> Conectado a{" "}
+              <span className="font-medium text-body">{integracion.email}</span>
+            </p>
+            <p>
+              Última revisión:{" "}
+              {integracion.ultima_revision
+                ? new Date(integracion.ultima_revision).toLocaleString()
+                : "aún no se procesa"}
+            </p>
+            <p className="text-xs text-muted">
               Los correos de BCP/Yape se revisan automáticamente cada 15 minutos.
             </p>
           </div>
         ) : (
-          <form onSubmit={handleConectar} className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Email de Gmail</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tucorreo@gmail.com"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">App password</label>
-              <input
-                type="password"
-                required
-                value={appPassword}
-                onChange={(e) => setAppPassword(e.target.value)}
-                placeholder="xxxx xxxx xxxx xxxx"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
+          <form onSubmit={handleConectar} className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Email de Gmail"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tucorreo@gmail.com"
+            />
+            <Input
+              label="App password"
+              type="password"
+              required
+              value={appPassword}
+              onChange={(e) => setAppPassword(e.target.value)}
+              placeholder="xxxx xxxx xxxx xxxx"
+            />
             <div className="sm:col-span-2">
-              <button
-                type="submit"
-                disabled={guardandoConexion}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
+              <Button type="submit" disabled={guardandoConexion}>
                 {guardandoConexion ? "Conectando..." : "Conectar Gmail"}
-              </button>
-              <p className="mt-2 text-xs text-gray-400">
+              </Button>
+              <p className="mt-2 text-xs text-muted">
                 Se guarda cifrada en Supabase Vault. Crea la app password en myaccount.google.com (Seguridad → App passwords).
               </p>
             </div>
           </form>
         )}
-      </div>
+      </Card>
 
       {/* Confirmar modal */}
-      {confirmando && (
-        <form onSubmit={handleConfirmar} className="animate-fade-slide-in rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">Confirmar gasto</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Monto (S/)</label>
-              <input
-                type="number" step="0.01" required value={formConfirmar.monto}
-                onChange={(e) => setFormConfirmar({ ...formConfirmar, monto: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Comercio / Nota</label>
-              <input
-                type="text" value={formConfirmar.nota}
-                onChange={(e) => setFormConfirmar({ ...formConfirmar, nota: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Tipo</label>
-              <select
-                value={formConfirmar.tipo}
-                onChange={(e) => setFormConfirmar({ ...formConfirmar, tipo: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              >
-                <option value="fijo">🔁 Fijo</option>
-                <option value="hormiga">🐜 Hormiga</option>
-                <option value="variable">🛒 Variable</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
-              <select
-                value={formConfirmar.categoria_id}
-                onChange={(e) => setFormConfirmar({ ...formConfirmar, categoria_id: e.target.value })}
-                required
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              >
-                <option value="">Seleccionar...</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>{c.icono_color} {c.nombre}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Fecha</label>
-              <input
-                type="date" required value={formConfirmar.fecha}
-                onChange={(e) => setFormConfirmar({ ...formConfirmar, fecha: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
+      <Modal
+        open={confirmando !== null}
+        onClose={() => setConfirmando(null)}
+        title="Confirmar gasto"
+        size="lg"
+      >
+        <form onSubmit={handleConfirmar} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Monto (S/)"
+              type="number"
+              step="0.01"
+              required
+              value={formConfirmar.monto}
+              onChange={(e) => setFormConfirmar({ ...formConfirmar, monto: e.target.value })}
+            />
+            <Input
+              label="Fecha"
+              type="date"
+              required
+              value={formConfirmar.fecha}
+              onChange={(e) => setFormConfirmar({ ...formConfirmar, fecha: e.target.value })}
+            />
           </div>
-          <div className="mt-4 flex gap-2">
-            <button
-              type="submit" disabled={guardando}
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+          <Input
+            label="Comercio / Nota"
+            type="text"
+            value={formConfirmar.nota}
+            onChange={(e) => setFormConfirmar({ ...formConfirmar, nota: e.target.value })}
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Select
+              label="Tipo"
+              value={formConfirmar.tipo}
+              onChange={(e) => setFormConfirmar({ ...formConfirmar, tipo: e.target.value })}
             >
-              {guardando ? "Guardando..." : "Confirmar como gasto"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmando(null)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+              <option value="fijo">🔁 Fijo</option>
+              <option value="hormiga">🐜 Hormiga</option>
+              <option value="variable">🛒 Variable</option>
+            </Select>
+            <Select
+              label="Categoría"
+              value={formConfirmar.categoria_id}
+              onChange={(e) => setFormConfirmar({ ...formConfirmar, categoria_id: e.target.value })}
+              required
             >
+              <option value="">Seleccionar...</option>
+              {categorias.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.icono_color} {c.nombre}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setConfirmando(null)}>
               Cancelar
-            </button>
+            </Button>
+            <Button type="submit" disabled={guardando} variant="up" icon={<CheckCircle2 size={14} />}>
+              {guardando ? "Guardando..." : "Confirmar como gasto"}
+            </Button>
           </div>
         </form>
-      )}
+      </Modal>
+
+      {/* Descartar */}
+      <ConfirmDialog
+        open={descartando !== null}
+        onConfirm={confirmarDescartar}
+        onCancel={() => setDescartando(null)}
+        title="Descartar gasto"
+        message={`¿Descartar "${descartando?.comercio || "este gasto"}"? El correo quedará registrado como procesado pero no se guardará como gasto.`}
+        confirmLabel="Descartar"
+      />
 
       {/* Lista de pendientes */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-4 py-3">
-          <h2 className="font-semibold text-gray-800">Pendientes de revisión</h2>
+      <Card padding="none">
+        <div className="border-b border-hairline px-4 py-3">
+          <h2 className="text-sm font-medium text-body">Pendientes de revisión</h2>
         </div>
         {cargando ? (
-          <div className="p-6 text-center text-gray-400">Cargando...</div>
-        ) : pendientesOk.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-gray-400">No hay gastos pendientes</p>
-            <p className="mt-1 text-xs text-gray-300">Los correos BCP detectados aparecerán aquí</p>
+          <div className="space-y-2 p-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-12" />
+            ))}
           </div>
+        ) : pendientesOk.length === 0 ? (
+          <EmptyState
+            icon={<Mail size={28} className="text-muted" />}
+            title="No hay gastos pendientes"
+            description="Los correos BCP detectados aparecerán aquí"
+          />
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-hairline">
             {pendientesOk.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 p-4 hover:bg-gray-50">
+              <div key={p.id} className="flex items-center justify-between gap-3 p-4 hover:bg-surface-elevated/50 transition-colors">
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-gray-900">{p.comercio}</div>
-                  <div className="text-sm text-gray-500">
-                    {TIPO_LABELS[p.tipo_gasto_sugerido || "variable"]}
-                    {p.fecha ? ` • ${new Date(p.fecha).toLocaleDateString()}` : ""}
+                  <div className="truncate text-sm font-medium text-body">{p.comercio}</div>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+                    <Badge variant="neutral">{TIPO_LABELS[p.tipo_gasto_sugerido || "variable"]}</Badge>
+                    {p.fecha ? <span>{new Date(p.fecha).toLocaleDateString()}</span> : null}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <span className="font-semibold text-red-600">-{formatearMoneda(Number(p.monto))}</span>
-                  <button
+                  <span className="text-sm font-semibold text-down">-{formatearMoneda(Number(p.monto))}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => abrirConfirmar(p)}
-                    className="rounded-lg px-2 py-1.5 text-sm text-green-700 hover:bg-green-50"
+                    className="text-up hover:text-up"
                   >
-                    ✓ Confirmar
-                  </button>
-                  <button
-                    onClick={() => handleDescartar(p)}
-                    className="rounded-lg px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-100"
+                    <CheckCircle2 size={15} className="mr-1" /> Confirmar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDescartando(p)}
+                    className="text-muted hover:text-down"
                   >
-                    Descartar
-                  </button>
+                    <XCircle size={15} className="mr-1" /> Descartar
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Correos no parseables */}
       {erroresParseo.length > 0 && (
-        <div className="rounded-xl border border-orange-200 bg-orange-50 shadow-sm">
-          <div className="border-b border-orange-200 px-4 py-3">
-            <h2 className="font-semibold text-orange-800">
-              Correos no parseables ({erroresParseo.length})
-            </h2>
-            <p className="text-xs text-orange-600">
+        <Card padding="none">
+          <div className="border-b border-hairline px-4 py-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={16} className="text-primary" />
+              <h2 className="text-sm font-medium text-body">
+                Correos no parseables ({erroresParseo.length})
+              </h2>
+            </div>
+            <p className="mt-1 text-xs text-muted">
               No se pudo extraer monto o comercio. Revisa el contenido crudo para procesarlos manualmente.
             </p>
           </div>
-          <div className="divide-y divide-orange-100">
+          <div className="divide-y divide-hairline">
             {erroresParseo.map((p) => (
               <div key={p.id} className="p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-orange-800">{p.parse_error}</p>
-                  <button
-                    onClick={() => handleDescartar(p)}
-                    className="shrink-0 rounded-lg px-2 py-1.5 text-sm text-gray-500 hover:bg-orange-100"
+                  <p className="text-sm font-medium text-primary">{p.parse_error}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDescartando(p)}
+                    className="shrink-0 text-muted hover:text-down"
                   >
-                    Descartar
-                  </button>
+                    <XCircle size={14} className="mr-1" /> Descartar
+                  </Button>
                 </div>
                 {p.cuerpo_html && (
-                  <p className="mt-2 line-clamp-3 text-xs text-orange-700/70">{p.cuerpo_html}</p>
+                  <p className="mt-2 line-clamp-3 text-xs text-muted">{p.cuerpo_html}</p>
                 )}
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

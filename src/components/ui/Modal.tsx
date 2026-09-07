@@ -9,9 +9,16 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  size?: "md" | "lg";
 }
 
-export default function Modal({ open, onClose, title, children }: ModalProps) {
+export default function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  size = "md",
+}: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
@@ -23,10 +30,12 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
 
   if (!open) return null;
 
+  const maxW = size === "lg" ? "max-w-2xl" : "max-w-lg";
+
   return (
     <div className="overlay-backdrop flex items-center justify-center" onClick={onClose}>
       <div
-        className="animate-fade-slide-in w-full max-w-lg rounded-lg bg-surface-elevated border border-hairline p-6 shadow-2xl mx-4"
+        className={`animate-fade-slide-in w-full ${maxW} rounded-lg bg-surface-elevated border border-hairline p-6 shadow-2xl mx-4`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-center justify-between">

@@ -81,20 +81,22 @@ export default function CategoriasPage() {
         title="Nueva Categoría"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Nombre"
-            type="text"
-            required
-            value={form.nombre}
-            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-          />
-          <Input
-            label="Icono (emoji)"
-            type="text"
-            placeholder="🍎"
-            value={form.icono_color}
-            onChange={(e) => setForm({ ...form, icono_color: e.target.value })}
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Nombre"
+              type="text"
+              required
+              value={form.nombre}
+              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+            />
+            <Input
+              label="Icono (emoji)"
+              type="text"
+              placeholder="🍎"
+              value={form.icono_color}
+              onChange={(e) => setForm({ ...form, icono_color: e.target.value })}
+            />
+          </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
               Cancelar

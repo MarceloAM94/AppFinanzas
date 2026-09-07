@@ -127,45 +127,48 @@ export default function GastosPage() {
         open={showForm}
         onClose={() => setShowForm(false)}
         title={editando ? "Editar Gasto" : "Nuevo Gasto"}
+        size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Monto (S/)"
-            type="number"
-            step="0.01"
-            required
-            value={form.monto}
-            onChange={(e) => setForm({ ...form, monto: e.target.value })}
-          />
-          <Select
-            label="Tipo"
-            value={form.tipo}
-            onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-          >
-            <option value="fijo">🔁 Fijo</option>
-            <option value="hormiga">🐜 Hormiga</option>
-            <option value="variable">🛒 Variable</option>
-          </Select>
-          <Select
-            label="Categoría"
-            value={form.categoria_id}
-            onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
-            required
-          >
-            <option value="">Seleccionar...</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.icono_color} {c.nombre}
-              </option>
-            ))}
-          </Select>
-          <Input
-            label="Fecha"
-            type="date"
-            required
-            value={form.fecha}
-            onChange={(e) => setForm({ ...form, fecha: e.target.value })}
-          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              label="Monto (S/)"
+              type="number"
+              step="0.01"
+              required
+              value={form.monto}
+              onChange={(e) => setForm({ ...form, monto: e.target.value })}
+            />
+            <Select
+              label="Tipo"
+              value={form.tipo}
+              onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+            >
+              <option value="fijo">🔁 Fijo</option>
+              <option value="hormiga">🐜 Hormiga</option>
+              <option value="variable">🛒 Variable</option>
+            </Select>
+            <Select
+              label="Categoría"
+              value={form.categoria_id}
+              onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}
+              required
+            >
+              <option value="">Seleccionar...</option>
+              {categorias.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.icono_color} {c.nombre}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Fecha"
+              type="date"
+              required
+              value={form.fecha}
+              onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+            />
+          </div>
           <Input
             label="Nota (opcional)"
             type="text"
