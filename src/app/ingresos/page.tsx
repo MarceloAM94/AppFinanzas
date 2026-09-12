@@ -104,6 +104,7 @@ export default function IngresosPage() {
         open={showForm}
         onClose={() => setShowForm(false)}
         title={editando ? "Editar Ingreso" : "Nuevo Ingreso"}
+        size="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -130,4 +130,5 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   background: rgba(0, 0, 0, 0.6);
   z-index: 50;
   animation: fadeIn 0.15s ease-out;
+  overflow-y: auto;
 }

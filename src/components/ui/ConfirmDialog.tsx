@@ -31,7 +31,7 @@ export default function ConfirmDialog({
             <AlertTriangle size={18} className="text-down" />
           </div>
         )}
-        <p className="text-sm text-muted-strong">{message}</p>
+        <p className="min-w-0 break-words text-sm text-muted-strong">{message}</p>
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="secondary" size="sm" onClick={onCancel}>
